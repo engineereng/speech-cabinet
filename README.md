@@ -65,6 +65,42 @@ This usually means the **worker never finished** the job (the hosted site has se
 - **Stale queue**: After crashes or bad jobs, run `yarn queue:clear` (worker stopped), then restart the worker.
 - **Dev server oddities**: If `/` 404s until restart, try removing `.next` and starting again.
 
+### E2E (Playwright)
+
+Upstream tracker: [#18](https://github.com/tm-a-t/speech-cabinet/issues/18). Install browsers once: `npx playwright install chromium`.
+
+```shell
+yarn test:e2e
+```
+
+- **Artifacts**: After a run, open `npx playwright show-report playwright-report` for the HTML report. Raw screen recordings are `video.webm` files under `test-results/`.
+- **Traces**: `PW_TRACE=1 yarn test:e2e` records a trace zip per test (large).
+- **Managed worker**: By default the suite spawns `yarn work`. If you already use `yarn dev:work`, set `PW_SKIP_MANAGED_WORKER=1`.
+- **Chrome profile lock** (`SingletonLock` under `tmp/browser`): stop every worker, then run with `PW_CLEAR_WORKER_BROWSER_TMP=1 yarn test:e2e` so the suite clears `tmp/browser` before starting the worker.
+- **Stress / repro**:
+  - `PW_STRESS_ITERATIONS=5 yarn test:e2e e2e/render-stress.spec.ts` — several full renders in one tab.
+  - `yarn test:e2e e2e/render-repro-missing-music.spec.ts` — expects “Rendering…” without download when the OST URL 404s (optional: `PW_REPRO_STUCK_MS=60000`).
+
+### Contributing from a fork
+
+Keep **`origin`** as the upstream repo (`tm-a-t/speech-cabinet`) and add your fork as **`fork`**:
+
+```shell
+git remote add fork git@github.com:YOUR_USER/speech-cabinet.git
+git fetch origin
+git checkout fix/18-rendering-stuck   # or your branch
+git push -u fork fix/18-rendering-stuck
+```
+
+Open the PR from your fork’s branch against **`tm-a-t/speech-cabinet:main`**.
+
+**Splitting into two PRs (example):**
+
+1. **Mitigations / docs** — e.g. `src/lib/disco-data.ts`, `src/server/queue.ts`, `scripts/clear-render-queue.ts`, README / `.env.example`, `queue:clear` + non-Playwright `package.json` / `yarn.lock` hunks (and optionally `engines` / `.nvmrc`).
+2. **E2E** — branch stacked on (1): `e2e/`, `playwright.config.ts`, Playwright devDependency + lockfile, `.gitignore` entries for test output.
+
+Use a second branch based on the first PR branch so `package.json` / `yarn.lock` do not fight each other.
+
 ### Using Docker
 
 The Docker image should build normally&mdash;but not on macOS, apparently?

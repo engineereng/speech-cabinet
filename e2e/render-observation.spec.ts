@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { getDefaultData, serialize } from "~/lib/disco-data";
+import { seedAndStartVideoRender } from "./helpers/render-flow";
 
 /** Default serialized editor data (`music: null` avoids gitignored `/music/*` 404s in the worker). */
 const DISCO_PAYLOAD = serialize(getDefaultData());
@@ -9,15 +10,7 @@ const DISCO_PAYLOAD = serialize(getDefaultData());
  * Playwright starts Next via webServer and the worker via global-setup; use PW_SKIP_MANAGED_WORKER=1 if you already run `yarn dev:work`.
  */
 test("Watch → Render video records until download starts", async ({ page }) => {
-  await page.addInitScript((payload) => {
-    localStorage.setItem("data", payload);
-  }, DISCO_PAYLOAD);
-
-  await page.goto("/");
-
-  await page.getByRole("button", { name: /watch/i }).click();
-
-  await page.getByRole("button", { name: /render video/i }).click();
+  await seedAndStartVideoRender(page, DISCO_PAYLOAD);
 
   await expect(page.getByText(/download started/i)).toBeVisible({
     timeout: 300_000,

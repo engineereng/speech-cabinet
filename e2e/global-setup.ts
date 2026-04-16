@@ -1,6 +1,6 @@
 import type { FullConfig } from "@playwright/test";
 import { spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pathForVideoWorker } from "./path-for-video-worker";
@@ -15,6 +15,14 @@ const pidFile = join(root, ".playwright-worker.pid");
 export default async function globalSetup(_config: FullConfig) {
   if (process.env.PW_SKIP_MANAGED_WORKER === "1") {
     return;
+  }
+
+  if (process.env.PW_CLEAR_WORKER_BROWSER_TMP === "1") {
+    try {
+      rmSync(join(root, "tmp/browser"), { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
   }
 
   const child = spawn("yarn", ["work"], {

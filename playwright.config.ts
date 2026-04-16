@@ -11,6 +11,13 @@ import { pathForVideoWorker } from "./e2e/path-for-video-worker";
  *   in `e2e/global-teardown.ts`. Set `PW_SKIP_MANAGED_WORKER=1` if you already run `yarn dev:work`.
  * - Set `CI=true` to reuse an already-running Next server on :3000.
  * - `ffmpeg` must be installed and discoverable (e.g. `brew install ffmpeg` on macOS).
+ *
+ * Recordings:
+ * - Videos: under test-results (video.webm per test). Set PW_VIDEO_OFF=1 to disable.
+ * - HTML report (after a run): npx playwright show-report playwright-report
+ * - Full trace (large): PW_TRACE=1 yarn test:e2e → trace.zip next to test output
+ * - Stale Chrome profile lock under tmp/browser (e.g. after a crashed render): stop all workers, then
+ *   PW_CLEAR_WORKER_BROWSER_TMP=1 yarn test:e2e so global setup removes tmp/browser before spawning the worker.
  */
 export default defineConfig({
   testDir: "./e2e",
@@ -20,14 +27,20 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   workers: 1,
-  reporter: "list",
+  reporter: [
+    ["list"],
+    ["html", { outputFolder: "playwright-report", open: "never" }],
+  ],
   timeout: 300_000,
   expect: { timeout: 300_000 },
   use: {
     ...devices["Desktop Chrome"],
     baseURL: "http://localhost:3000",
-    trace: "on-first-retry",
-    video: "on",
+    trace: process.env.PW_TRACE === "1" ? "on" : "on-first-retry",
+    video:
+      process.env.PW_VIDEO_OFF === "1"
+        ? "off"
+        : { mode: "on", size: { width: 1280, height: 720 } },
     viewport: { width: 1280, height: 720 },
   },
   webServer: {
