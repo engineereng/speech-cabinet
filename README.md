@@ -53,6 +53,18 @@ Animation is made purely with CSS/JS, but the videos are rendered on server: a w
 
    (The worker requires maximum Node 20 because the library for rendering videos uses a deprecated function.)
 
+### Rendering stuck on “Rendering…” (no download)
+
+This usually means the **worker never finished** the job (the hosted site has seen similar queue issues; see [#18](https://github.com/tm-a-t/speech-cabinet/issues/18)). When self-hosting, check:
+
+- **Worker running**: `yarn dev:work` (or your process manager) alongside `yarn dev`.
+- **Node 20**: Newer Node versions can break the video library; use `.nvmrc` / `engines` in `package.json`.
+- **`DATABASE_URL`**: Must point at Postgres with the schema applied (`yarn db:push`). A wrong role name often shows up when **PgBoss** starts.
+- **`ffmpeg` on `PATH`**: Required for video synthesis.
+- **Background music**: Default project data uses **no** OST until you add files under `public/music/` and pick one in the UI. A missing track URL can fail the worker.
+- **Stale queue**: After crashes or bad jobs, run `yarn queue:clear` (worker stopped), then restart the worker.
+- **Dev server oddities**: If `/` 404s until restart, try removing `.next` and starting again.
+
 ### Using Docker
 
 The Docker image should build normally&mdash;but not on macOS, apparently?

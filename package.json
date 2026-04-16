@@ -3,15 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=18 <=20"
+  },
   "scripts": {
     "build": "SKIP_ENV_VALIDATION=true next build",
     "db:generate": "prisma migrate dev",
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
+    "queue:clear": "tsx --env-file=.env scripts/clear-render-queue.ts",
     "dev": "next dev",
     "dev:work": "tsx watch --env-file=.env src/worker/worker.ts",
     "lint": "next lint",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "postinstall": "prisma generate",
     "start": "next start",
     "work": "tsx --env-file=.env src/worker/worker.ts",
@@ -77,7 +83,8 @@
     "prettier-plugin-tailwindcss": "^0.6.5",
     "prisma": "^5.14.0",
     "tailwindcss": "^3.4.3",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "@playwright/test": "^1.49.1"
   },
   "overrides": {
     "cacheable-request": {

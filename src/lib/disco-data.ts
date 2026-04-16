@@ -76,7 +76,9 @@ export const getDefaultData = () => discoData.parse({
     portraitUrl: {},
   },
   showPortraits: true,
-  music: '/music/Sea Power - Instrument of Surrender.m4a',
+  // null until the user adds files under public/music/ and picks an OST. A missing file 404s in the
+  // render worker and matches the "Rendering…" forever symptom for many self-hosted setups (#18).
+  music: null,
   skipMusicIntro: true,
   version: '0.1',
 });

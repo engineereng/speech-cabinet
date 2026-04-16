@@ -4,7 +4,23 @@ import type {DiscoData} from '~/lib/disco-data';
 
 export const boss = new PgBoss(env.DATABASE_URL);
 boss.on('error', console.error);
-await boss.start();
+
+try {
+  await boss.start();
+} catch (e) {
+  const err = e instanceof Error ? e.message : String(e);
+  let dbUser = '(unknown)';
+  try {
+    dbUser = new URL(env.DATABASE_URL).username || '(empty)';
+  } catch {
+    dbUser = '(invalid-url)';
+  }
+  const roleHint =
+    err.includes('role') && err.includes('does not exist')
+      ? ` DATABASE_URL user "${dbUser}" is not a PostgreSQL role on this server. Create it or use an existing user (many local installs use the superuser "postgres"). See .env.example.`
+      : ' Check DATABASE_URL, Postgres is running, and run `yarn db:push` so the schema exists.';
+  throw new Error(`PgBoss could not start:${roleHint} (${err})`, {cause: e});
+}
 
 export const queue = 'render-video';
 type RenderVideoData = {
