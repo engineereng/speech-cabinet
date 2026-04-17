@@ -11,24 +11,25 @@ Do this in **[Vercel](https://vercel.com)** → your team → **speech-cabinet**
 1. **Open Environment Variables**  
    Project → **Settings** → **Environment Variables**.
 
-2. **Add `DATABASE_URL` for Preview**  
-   - **Key**: `DATABASE_URL`  
-   - **Value**: A Postgres connection string the preview app can use (same format as local: `postgresql://USER:PASSWORD@HOST:PORT/DB?sslmode=require`).  
-   - **Environments**: enable **Preview** (and **Production** if you use the same DB pattern there).  
-   - Use a **dedicated database or branch** for previews if you can (Neon/Supabase often support branch DBs). Avoid pointing Preview at production data unless you intend to.
+2. **Add Postgres URLs for Preview**  
+   - **`DATABASE_URL`**: Pooled connection string (e.g. Neon **pooler** host, `…-pooler…`). Used by the app at runtime.  
+   - **`DATABASE_URL_UNPOOLED`**: Direct connection string (Neon **non-pooler** host, no PgBouncer). Required by Prisma in this repo for **`prisma migrate`** (`directUrl` in `prisma/schema.prisma`).  
+   - **Environments**: enable **Preview** (and **Production** as needed).  
+   - Use a **dedicated Neon branch or database** for previews when possible. Avoid pointing Preview at production data unless you intend to.
 
 3. **Add the same secrets the app expects at runtime** (see `src/env.js` and `.env.example`). Typical minimum for a working Preview:
 
    | Variable | Preview notes |
    |----------|----------------|
-   | `DATABASE_URL` | Required for Prisma, pg-boss, and auth adapter. |
+   | `DATABASE_URL` | Required for Prisma, pg-boss, and auth adapter (Neon: **pooled** URL). |
+   | `DATABASE_URL_UNPOOLED` | Neon **direct** URL for migrations (same DB as `DATABASE_URL`). Local Postgres without a pooler: set equal to `DATABASE_URL`. |
    | `NEXTAUTH_SECRET` | Required when `NODE_ENV` is `production` (Vercel). Generate once: `openssl rand -base64 32`. |
    | `NEXTAUTH_URL` | Often left unset on Vercel; NextAuth can use `VERCEL_URL`. If login redirects break, set to your Preview URL (e.g. `https://speech-cabinet-git-<branch>-<team>.vercel.app`). |
    | `CHROME_PATH` | **Web app** builds: set to `auto` or a path if your server code resolves it. The **render worker** (below) needs a real Chrome/Chromium path in its own environment. |
 
 4. **Redeploy**  
    After saving variables, open **Deployments**, open the latest Preview, **⋯** → **Redeploy** (or push a commit).  
-   Builds run `scripts/vercel-build.mjs`: **`prisma migrate deploy` runs only when `DATABASE_URL` is present** for that environment.
+   Builds run `scripts/vercel-build.mjs`: **`prisma migrate deploy` runs only when both `DATABASE_URL` and `DATABASE_URL_UNPOOLED` are present** for that environment.
 
 5. **Confirm**  
    Open the deployment **Build** log: you should see `prisma migrate deploy` succeed (not only “skipping migrate”).
@@ -45,7 +46,8 @@ Set these in the process manager / container (not necessarily identical to every
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | Same database as the web app (pg-boss queue lives here). |
+| `DATABASE_URL` | Same database as the web app (pg-boss queue lives here). With Neon, use the **pooled** URL. |
+| `DATABASE_URL_UNPOOLED` | Same DB via Neon **direct** host (for Prisma; match Vercel). Local: can match `DATABASE_URL`. |
 | `WEB_URL` | Public base URL of the Next deployment the worker should render **against** (e.g. `https://speech-cabinet.vercel.app` or your Preview URL). **Must match** the site where users click “Render”. |
 | `NODE_ENV` | `production` |
 | `NEXTAUTH_SECRET` | Same value as Vercel (required in production by `src/env.js`). |

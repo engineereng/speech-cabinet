@@ -11,7 +11,9 @@ datasource db {
   // Further reading:
   // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
   // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
-  url      = env("DATABASE_URL")
+  // Neon: pooled `DATABASE_URL` for the app; unpooled `DATABASE_URL_UNPOOLED` for migrate (no PgBouncer).
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 model Video {

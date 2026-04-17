@@ -20,8 +20,13 @@ function run(cmd, args, extraEnv = {}) {
 }
 
 const dbUrl = process.env.DATABASE_URL?.trim();
-if (dbUrl) {
+const directUrl = process.env.DATABASE_URL_UNPOOLED?.trim();
+if (dbUrl && directUrl) {
   run("npx", ["prisma", "migrate", "deploy"]);
+} else if (dbUrl && !directUrl) {
+  console.warn(
+    "[vercel-build] DATABASE_URL_UNPOOLED is not set; skipping prisma migrate deploy. Add Neon’s unpooled connection string (see prisma/schema.prisma directUrl).",
+  );
 } else {
   console.warn(
     "[vercel-build] DATABASE_URL is not set; skipping prisma migrate deploy. Add DATABASE_URL to the Preview (and Production) environment on Vercel so migrations run on deploy.",
