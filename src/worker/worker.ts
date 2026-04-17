@@ -60,9 +60,9 @@ function withDeadline<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
         clearTimeout(t);
         resolve(v);
       },
-      (e) => {
+      (e: unknown) => {
         clearTimeout(t);
-        reject(e);
+        reject(e instanceof Error ? e : new Error(String(e)));
       },
     );
   });
@@ -105,7 +105,7 @@ async function renderVideo(data: DiscoData, id: string, convertToGif: boolean) {
       await db.video.update({where: {id}, data: {progress: Math.floor(progress)}}).catch(console.error);
     });
     await withDeadline(
-      video.startAndWait(),
+      video.startAndWait() as Promise<void>,
       renderDeadlineMs(),
       'video.startAndWait',
     );
