@@ -106,6 +106,10 @@ Use a second branch based on the first PR branch so `package.json` / `yarn.lock`
 The Docker image should build normally&mdash;but not on macOS, apparently?
 Downloading Chrome in Docker doesn’t work on my macOS for some reason.
 
+### Hosting: Vercel previews + the render worker
+
+Preview deployments need **`DATABASE_URL`** (and related secrets) in the Vercel project; the **video worker** is a separate process (Docker Compose `worker`, another container, or a VM). Step-by-step dashboard instructions and a minimal worker runbook: [docs/hosting-vercel-and-worker.md](docs/hosting-vercel-and-worker.md).
+
 </details>
 
 ## Contributions
