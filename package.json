@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "SKIP_ENV_VALIDATION=true next build",
-    "vercel-build": "prisma migrate deploy && prisma generate && SKIP_ENV_VALIDATION=true next build",
+    "vercel-build": "node scripts/vercel-build.mjs",
     "db:generate": "prisma migrate dev",
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",

@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "yarn vercel-build",
-  "installCommand": "yarn install --frozen-lockfile"
+  "installCommand": "yarn install --frozen-lockfile",
+  "fluid": true,
+  "functions": {
+    "src/app/api/**/*": {
+      "maxDuration": 60
+    }
+  }
 }
