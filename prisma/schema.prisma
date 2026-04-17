@@ -15,9 +15,11 @@ datasource db {
 }
 
 model Video {
-  id       String  @id @default(uuid())
-  isReady  Boolean @default(false)
-  progress Int     @default(0)
+  id          String  @id @default(uuid())
+  isReady     Boolean @default(false)
+  progress    Int     @default(0)
+  /// Set when the render worker fails so the UI can exit "Rendering…" instead of polling forever (#18).
+  renderError String? @db.Text
 }
 
 // Necessary for Next auth

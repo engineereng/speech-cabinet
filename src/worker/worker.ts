@@ -5,7 +5,7 @@
 
 import {boss, queue, type RenderVideoJob} from '~/server/queue';
 import {type DiscoData, serialize} from '~/lib/disco-data';
-import { getGifPath, getVideoPath, sleep } from "~/lib/utils";
+import { getGifPath, getVideoPath } from "~/lib/utils";
 import {totalDuration, totalTimeLimit} from '~/lib/time';
 import {db} from '~/server/db';
 // @ts-expect-error untyped lib :(
@@ -33,63 +33,108 @@ const WEB_URL = env.WEB_URL ?? 'http://localhost:3000'
 const GIF_FPS = 10
 const GIF_WIDTH = 720
 
+/** Wall-clock cap for `video.startAndWait()` so a stuck WebVideoCreator run does not block the worker forever (#18). */
+const DEFAULT_RENDER_DEADLINE_MS = 60 * 60 * 1000;
+
+function renderDeadlineMs(): number {
+  const raw = process.env.RENDER_DEADLINE_MS;
+  if (raw !== undefined && raw !== '') {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) {
+      return n;
+    }
+  }
+  return DEFAULT_RENDER_DEADLINE_MS;
+}
+
+function withDeadline<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  if (!Number.isFinite(ms) || ms <= 0) {
+    return p;
+  }
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => {
+      reject(new Error(`${label} exceeded ${String(ms)}ms (RENDER_DEADLINE_MS)`));
+    }, ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
 async function renderVideo(data: DiscoData, id: string, convertToGif: boolean) {
-  const filename = getVideoPath(id);
+  try {
+    const filename = getVideoPath(id);
 
-  const video = wvc.createSingleVideo({
-    url: WEB_URL + '/render',
-    width: 1080,
-    height: 1920,
-    fps: 30,
-    duration: Math.min(totalDuration(data), totalTimeLimit),
-    outputPath: filename,
-    pagePrepareFn: async (page: Page) => {
-      const puppeteerPage = page.target as PuppeteerPage;
-      const serialized = serialize(data);
-      await puppeteerPage.evaluate(({serialized}) => {
-        localStorage.setItem('data', serialized);
-        window.dispatchEvent(new Event('disco', {}));
-      }, { serialized });
-    },
-  });
-
-  // Add music here because music added with <audio> in Player
-  // does not work for some reason.
-  // Constants derived from music.ts#playMusic, should refactor this later.
-  if (data.music) {
-    video.addAudio({
-      url: WEB_URL + data.music,
-      volume: 20,
-      loop: true,
-      seekStart: data.skipMusicIntro ? 37000 : 0,
+    const video = wvc.createSingleVideo({
+      url: WEB_URL + '/render',
+      width: 1080,
+      height: 1920,
+      fps: 30,
+      duration: Math.min(totalDuration(data), totalTimeLimit),
+      outputPath: filename,
+      pagePrepareFn: async (page: Page) => {
+        const puppeteerPage = page.target as PuppeteerPage;
+        const serialized = serialize(data);
+        await puppeteerPage.evaluate(({serialized}) => {
+          localStorage.setItem('data', serialized);
+          window.dispatchEvent(new Event('disco', {}));
+        }, { serialized });
+      },
     });
-  }
 
-  video.on("progress", async (progress: number) => {
-    await db.video.update({where: {id}, data: {progress: Math.floor(progress)}}).catch(console.error);
-  });
-  await video.startAndWait();
+    // Add music here because music added with <audio> in Player
+    // does not work for some reason.
+    // Constants derived from music.ts#playMusic, should refactor this later.
+    if (data.music) {
+      video.addAudio({
+        url: WEB_URL + data.music,
+        volume: 20,
+        loop: true,
+        seekStart: data.skipMusicIntro ? 37000 : 0,
+      });
+    }
 
-  if (convertToGif) {
-    await run(
-      `ffmpeg`,
-      `-i`, filename,
-      `-vf`, `fps=${GIF_FPS},scale=${GIF_WIDTH}:-1:flags=lanczos,palettegen`,
-      `${filename}.palette.png`,
-      `-update`, `true`,
-      `-nostdin`,
+    video.on("progress", async (progress: number) => {
+      await db.video.update({where: {id}, data: {progress: Math.floor(progress)}}).catch(console.error);
+    });
+    await withDeadline(
+      video.startAndWait(),
+      renderDeadlineMs(),
+      'video.startAndWait',
     );
-    await run(
-      `ffmpeg`,
-      `-i`, filename,
-      `-i`, `${filename}.palette.png`,
-      `-lavfi`, `fps=${GIF_FPS},scale=${GIF_WIDTH}:-1:flags=lanczos [x]; [x][1:v] paletteuse`,
-      `-nostdin`,
-      getGifPath(id),
-    );
-  }
 
-  await db.video.update({where: {id}, data: {isReady: true}});
+    if (convertToGif) {
+      await run(
+        `ffmpeg`,
+        `-i`, filename,
+        `-vf`, `fps=${GIF_FPS},scale=${GIF_WIDTH}:-1:flags=lanczos,palettegen`,
+        `${filename}.palette.png`,
+        `-update`, `true`,
+        `-nostdin`,
+      );
+      await run(
+        `ffmpeg`,
+        `-i`, filename,
+        `-i`, `${filename}.palette.png`,
+        `-lavfi`, `fps=${GIF_FPS},scale=${GIF_WIDTH}:-1:flags=lanczos [x]; [x][1:v] paletteuse`,
+        `-nostdin`,
+        getGifPath(id),
+      );
+    }
+
+    await db.video.update({where: {id}, data: {isReady: true, renderError: null}});
+  } catch (err) {
+    const message = String(err).slice(0, 8000);
+    await db.video.update({where: {id}, data: {renderError: message}}).catch(console.error);
+    throw err;
+  }
 }
 
 function run(command: string, ...args: string[]): Promise<void> {

@@ -21,10 +21,21 @@ export async function getVideoQueuePosition(id: string): Promise<number> {
   return await getJobPosition(id);
 }
 
-export async function getVideoProgress(id: string): Promise<number | 'finished'> {
+export type VideoProgressResult =
+  | { status: 'progress'; progress: number }
+  | { status: 'finished' }
+  | { status: 'failed'; message: string };
+
+export async function getVideoProgress(id: string): Promise<VideoProgressResult> {
   const video = await db.video.findFirst({where: {id}});
-  if (video?.isReady) {
-    return 'finished';
+  if (!video) {
+    return {status: 'failed', message: 'Video not found'};
   }
-  return video?.progress ?? 0;
+  if (video.isReady) {
+    return {status: 'finished'};
+  }
+  if (video.renderError) {
+    return {status: 'failed', message: video.renderError};
+  }
+  return {status: 'progress', progress: video.progress};
 }

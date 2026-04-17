@@ -16,8 +16,7 @@ import { pathForVideoWorker } from "./e2e/path-for-video-worker";
  * - Videos: under test-results (video.webm per test). Set PW_VIDEO_OFF=1 to disable.
  * - HTML report (after a run): npx playwright show-report playwright-report
  * - Full trace (large): PW_TRACE=1 yarn test:e2e → trace.zip next to test output
- * - Stale Chrome profile lock under tmp/browser (e.g. after a crashed render): stop all workers, then
- *   PW_CLEAR_WORKER_BROWSER_TMP=1 yarn test:e2e so global setup removes tmp/browser before spawning the worker.
+ * - Global setup always deletes tmp/browser and clears the render queue before starting the worker (bounded waits).
  */
 export default defineConfig({
   testDir: "./e2e",

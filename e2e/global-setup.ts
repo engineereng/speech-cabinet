@@ -1,5 +1,5 @@
 import type { FullConfig } from "@playwright/test";
-import { spawn } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,12 +17,21 @@ export default async function globalSetup(_config: FullConfig) {
     return;
   }
 
-  if (process.env.PW_CLEAR_WORKER_BROWSER_TMP === "1") {
-    try {
-      rmSync(join(root, "tmp/browser"), { recursive: true, force: true });
-    } catch {
-      /* ignore */
-    }
+  try {
+    rmSync(join(root, "tmp/browser"), { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    execSync("npx tsx --env-file=.env scripts/clear-render-queue.ts", {
+      cwd: root,
+      stdio: "ignore",
+      env: { ...process.env },
+      timeout: 15_000,
+    });
+  } catch {
+    /* ignore: DB may be unavailable in some environments */
   }
 
   const child = spawn("yarn", ["work"], {
@@ -30,7 +39,12 @@ export default async function globalSetup(_config: FullConfig) {
     stdio: "inherit",
     shell: true,
     detached: true,
-    env: { ...process.env, PATH: pathForVideoWorker() },
+    env: {
+      ...process.env,
+      PATH: pathForVideoWorker(),
+      // Cap stuck WebVideoCreator runs so repro tests finish in ~1–2m, not 5m+ (override with RENDER_DEADLINE_MS).
+      RENDER_DEADLINE_MS: process.env.RENDER_DEADLINE_MS ?? "75000",
+    },
   });
 
   let workerExitCode: number | undefined;
