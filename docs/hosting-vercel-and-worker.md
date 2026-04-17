@@ -93,7 +93,7 @@ You can run **two** worker processes (or two containers) with different `WEB_URL
 - **Auth / env validation errors in worker**: Match `NEXTAUTH_SECRET` (and related) to Vercel.
 - **P3009 / “failed migrations in the target database”** (e.g. after `20260416070000_video_render_error` failed on Neon): Prisma blocks new migrations until you mark that migration rolled back, then deploy again.
   1. Locally, set **`DATABASE_URL`** and **`DATABASE_URL_UNPOOLED`** in `.env` to the same Neon values as Vercel Preview/Production.
-  2. Run: `yarn db:resolve:failed-video-migration` (runs `prisma migrate resolve --rolled-back 20260416070000_video_render_error`).
+  2. Run: `yarn db:resolve:failed-video-migration` (runs `prisma migrate resolve --rolled-back 20260416070000_video_render_error`). **Skip this** if you see *“database without migrations table”* — that means `_prisma_migrations` was never created (new/reset DB). Go straight to step 3.
   3. Run: `yarn db:migrate` to apply pending migrations (`20260416000000_init_schema`, then `video_render_error`).
   4. Trigger a **Redeploy** on Vercel (or push a commit). Build should pass `prisma migrate deploy` because the DB is aligned.
 - **P3018**: See [Prisma troubleshooting](https://www.prisma.io/docs/orm/prisma-migrate/workflows/troubleshooting). After adding the baseline `init_schema` migration, new empty databases apply migrations in order; **existing** Neon DBs that already recorded a **failed** migration need the resolve step above.
