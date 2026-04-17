@@ -91,3 +91,5 @@ You can run **two** worker processes (or two containers) with different `WEB_URL
 - **Queue never drains**: Worker not running, wrong `DATABASE_URL`, or `WEB_URL` not reachable from the worker host.
 - **Migrate skipped on Vercel**: `DATABASE_URL` missing for that environment in the Vercel project settings.
 - **Auth / env validation errors in worker**: Match `NEXTAUTH_SECRET` (and related) to Vercel.
+- **P3018 / failed migration after a bad deploy**: In Neon **SQL Editor** (or `psql`), inspect `_prisma_migrations`. If a migration failed on an empty DB, remove the failed row or follow [Prisma’s migrate resolve](https://www.prisma.io/docs/orm/prisma-migrate/workflows/troubleshooting) guidance, then **Redeploy** on Vercel. After adding a baseline `init` migration, a fresh database should apply migrations in order without manual steps.
+
