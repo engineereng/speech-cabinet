@@ -21,7 +21,14 @@ export const env = createEnv({
       // VERCEL_URL doesn't include `https` so it cant be validated as a URL
       process.env.VERCEL ? z.string() : z.string().url()
     ),
-    CHROME_PATH: z.string(),
+    // Chrome is only used by the separate render worker; the Next.js app on Vercel does not need a real path.
+    CHROME_PATH: z.preprocess((val) => {
+      const v = val === "" ? undefined : val;
+      if (process.env.VERCEL && (v === undefined || v === null)) {
+        return "auto";
+      }
+      return v;
+    }, z.string()),
     WEB_URL: z.string().optional(),
   },
 

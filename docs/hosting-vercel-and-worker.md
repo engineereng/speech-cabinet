@@ -23,9 +23,9 @@ Do this in **[Vercel](https://vercel.com)** → your team → **speech-cabinet**
    |----------|----------------|
    | `DATABASE_URL` | Required for Prisma, pg-boss, and auth adapter (Neon: **pooled** URL). |
    | `DATABASE_URL_UNPOOLED` | Neon **direct** URL for migrations (same DB as `DATABASE_URL`). Local Postgres without a pooler: set equal to `DATABASE_URL`. |
-   | `NEXTAUTH_SECRET` | Required when `NODE_ENV` is `production` (Vercel). Generate once: `openssl rand -base64 32`. |
-   | `NEXTAUTH_URL` | Often left unset on Vercel; NextAuth can use `VERCEL_URL`. If login redirects break, set to your Preview URL (e.g. `https://speech-cabinet-git-<branch>-<team>.vercel.app`). |
-   | `CHROME_PATH` | **Web app** builds: set to `auto` or a path if your server code resolves it. The **render worker** (below) needs a real Chrome/Chromium path in its own environment. |
+   | `NEXTAUTH_SECRET` | Required when `NODE_ENV` is `production` (Vercel). Generate once: `openssl rand -base64 32`. **Enable for Preview** (and Production) in the Vercel UI — a var only on “Production” does not apply to preview deployments. |
+   | `NEXTAUTH_URL` | Optional on Vercel: `env.js` falls back to `VERCEL_URL` for validation. If OAuth/callback URLs are wrong, set explicitly to your deployment URL, e.g. `https://speech-cabinet-git-<branch>-<team>.vercel.app`. |
+   | `CHROME_PATH` | On Vercel the app defaults to **`auto`** if unset (`VERCEL` is set). The **render worker** still needs a real Chrome path (or `auto`) in **its** environment. |
 
 4. **Redeploy**  
    After saving variables, open **Deployments**, open the latest Preview, **⋯** → **Redeploy** (or push a commit).  
