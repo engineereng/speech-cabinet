@@ -15,6 +15,8 @@ import { type Page } from "web-video-creator/core";
 import { type Page as PuppeteerPage } from "puppeteer-core";
 import { env } from "~/env";
 import { spawn } from 'child_process';
+import { put } from '@vercel/blob';
+import * as fs from 'node:fs';
 
 const wvc = new WebVideoCreator();
 wvc.config({
@@ -32,6 +34,25 @@ wvc.config({
 const WEB_URL = env.WEB_URL ?? 'http://localhost:3000'
 const GIF_FPS = 10
 const GIF_WIDTH = 720
+
+/**
+ * Append Vercel Deployment-Protection bypass query params when a secret is configured,
+ * so Puppeteer can reach protected Preview URLs (issue #18). The `samesitenone` cookie
+ * variant lets sub-requests from the page (e.g. music) pass without per-URL rewrites.
+ */
+function withBypass(rawUrl: string): string {
+  const secret = env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (!secret) return rawUrl;
+  try {
+    const u = new URL(rawUrl);
+    u.searchParams.set('x-vercel-protection-bypass', secret);
+    u.searchParams.set('x-vercel-set-bypass-cookie', 'samesitenone');
+    return u.toString();
+  } catch {
+    const sep = rawUrl.includes('?') ? '&' : '?';
+    return `${rawUrl}${sep}x-vercel-protection-bypass=${encodeURIComponent(secret)}&x-vercel-set-bypass-cookie=samesitenone`;
+  }
+}
 
 /** Wall-clock cap for `video.startAndWait()` so a stuck WebVideoCreator run does not block the worker forever (#18). */
 const DEFAULT_RENDER_DEADLINE_MS = 60 * 60 * 1000;
@@ -73,7 +94,7 @@ async function renderVideo(data: DiscoData, id: string, convertToGif: boolean) {
     const filename = getVideoPath(id);
 
     const video = wvc.createSingleVideo({
-      url: WEB_URL + '/render',
+      url: withBypass(WEB_URL + '/render'),
       width: 1080,
       height: 1920,
       fps: 30,
@@ -94,7 +115,7 @@ async function renderVideo(data: DiscoData, id: string, convertToGif: boolean) {
     // Constants derived from music.ts#playMusic, should refactor this later.
     if (data.music) {
       video.addAudio({
-        url: WEB_URL + data.music,
+        url: withBypass(WEB_URL + data.music),
         volume: 20,
         loop: true,
         seekStart: data.skipMusicIntro ? 37000 : 0,
@@ -129,12 +150,52 @@ async function renderVideo(data: DiscoData, id: string, convertToGif: boolean) {
       );
     }
 
-    await db.video.update({where: {id}, data: {isReady: true, renderError: null}});
+    // Upload artifacts to shared object storage so the Vercel app can serve them (#18).
+    // Without this, /api/video/[id] 404s because the lambda has no access to the worker's local fs.
+    const videoUrl = await uploadArtifact(id, filename, 'video/mp4');
+    const gifUrl = convertToGif
+      ? await uploadArtifact(id, getGifPath(id), 'image/gif')
+      : null;
+
+    await db.video.update({
+      where: {id},
+      data: {isReady: true, renderError: null, videoUrl, gifUrl},
+    });
   } catch (err) {
     const message = String(err).slice(0, 8000);
     await db.video.update({where: {id}, data: {renderError: message}}).catch(console.error);
     throw err;
   }
+}
+
+/**
+ * Upload a rendered artifact (mp4 / gif) to Vercel Blob so the Next.js app running on
+ * Vercel can serve it from `src/app/api/{video,gif}/[id]/route.ts` (#18). Falls back
+ * to `null` (local-only dev without BLOB_READ_WRITE_TOKEN) so the worker stays usable
+ * against a purely local stack.
+ */
+async function uploadArtifact(
+  id: string,
+  filePath: string,
+  contentType: 'video/mp4' | 'image/gif',
+): Promise<string | null> {
+  if (!env.BLOB_READ_WRITE_TOKEN) {
+    console.warn(
+      `[worker] BLOB_READ_WRITE_TOKEN not set; skipping upload of ${filePath}. Vercel-hosted downloads will 404.`,
+    );
+    return null;
+  }
+  const ext = contentType === 'image/gif' ? 'gif' : 'mp4';
+  const pathname = `videos/${id}.${ext}`;
+  const stream = fs.createReadStream(filePath);
+  const { url } = await put(pathname, stream, {
+    access: 'public',
+    contentType,
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    token: env.BLOB_READ_WRITE_TOKEN,
+  });
+  return url;
 }
 
 function run(command: string, ...args: string[]): Promise<void> {

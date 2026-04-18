@@ -24,6 +24,10 @@ model Video {
   progress    Int     @default(0)
   /// Set when the render worker fails so the UI can exit "Rendering…" instead of polling forever (#18).
   renderError String? @db.Text
+  /// Public URL of the rendered mp4 in object storage (Vercel Blob). Null until worker uploads (#18).
+  videoUrl    String? @db.Text
+  /// Public URL of the rendered GIF in object storage (Vercel Blob). Null until worker uploads (#18).
+  gifUrl      String? @db.Text
 }
 
 // Necessary for Next auth

@@ -28,6 +28,13 @@ export const env = createEnv({
       return v;
     }, z.string()),
     WEB_URL: z.string().optional(),
+    // Optional: Vercel "Protection Bypass for Automation" secret so the worker's Puppeteer
+    // navigation can reach WEB_URL when Deployment Protection is on (issue #18).
+    VERCEL_AUTOMATION_BYPASS_SECRET: z.string().optional(),
+    // Optional: Vercel Blob read/write token. Required for the worker to upload rendered
+    // mp4/gif artifacts so the Vercel-hosted app can serve them (#18). Auto-injected on
+    // Vercel once a Blob store is attached; set manually on any off-Vercel worker host.
+    BLOB_READ_WRITE_TOKEN: z.string().optional(),
   },
 
   /**
@@ -44,6 +51,8 @@ export const env = createEnv({
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     CHROME_PATH: process.env.CHROME_PATH,
     WEB_URL: process.env.WEB_URL,
+    VERCEL_AUTOMATION_BYPASS_SECRET: process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+    BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially
