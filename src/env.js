@@ -10,14 +10,16 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
-    // Optional: no OAuth providers are configured yet (`src/server/auth.ts`). Set when you add sign-in.
+    // Optional: no OAuth providers yet (`src/server/auth.ts`). Vercel uses NODE_ENV=production;
+    // do not require NEXTAUTH_SECRET on every Preview until sign-in is wired.
     NEXTAUTH_SECRET: z.string().optional(),
     NEXTAUTH_URL: z.preprocess(
       // This makes Vercel deployments not fail if you don't set NEXTAUTH_URL
       // Since NextAuth.js automatically uses the VERCEL_URL if present.
       (str) => process.env.VERCEL_URL ?? str,
-      // VERCEL_URL doesn't include `https` so it cant be validated as a URL
-      process.env.VERCEL ? z.string() : z.string().url()
+      // VERCEL_URL doesn't include `https` so it cant be validated as a URL.
+      // `.optional()` covers rare cases where VERCEL is set before VERCEL_URL is injected.
+      process.env.VERCEL ? z.string().optional() : z.string().url()
     ),
     // Chrome is only used by the separate render worker; the Next.js app on Vercel does not need a real path.
     CHROME_PATH: z.preprocess((val) => {
