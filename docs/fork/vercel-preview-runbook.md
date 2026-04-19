@@ -53,11 +53,13 @@ Project **speech-cabinet** → **Settings** → **Environment Variables** → sc
 | -------- | ------- |
 | `DATABASE_URL` | Pooled Postgres (e.g. Neon pooler host). App + pg-boss at runtime. |
 | `DATABASE_URL_UNPOOLED` | Direct Neon host (same DB). Required for `prisma migrate deploy` in build. |
-| `NEXTAUTH_SECRET` | Required in production worker path; set for Preview to match worker. |
+| `NEXTAUTH_SECRET` | Optional for the **Next.js** deployment on Vercel when using current `src/env.js` (no OAuth providers yet). Set for Preview/Production when you add sign-in; **worker** should use the same value as the app if you enforce auth in production. |
 | `BLOB_READ_WRITE_TOKEN` | Worker uploads mp4/gif to Vercel Blob; create store / pull token (`vercel env pull`). |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | If **Deployment Protection** is on for Previews: worker Puppeteer must bypass (see `withBypass` in worker). Often auto on Vercel; worker still needs the same value in **its** env. |
 
 Then **Redeploy** the latest Preview (env changes do not apply to old deployment artifacts until redeploy).
+
+**Slim branches (e.g. off `main`):** `src/env.js` defaults **`CHROME_PATH` to `auto`** when `VERCEL` is set and does **not** require `NEXTAUTH_SECRET` for production builds, so new Previews are not blocked if those variables are missing in the dashboard.
 
 **Build log:** you should see `prisma migrate deploy` run (not skipped). If it skips, either URL is missing or Neon integration is overriding—see [hosting doc § Neon + Vercel](../hosting-vercel-and-worker.md#neon--vercel-one-database-for-builds).
 
@@ -75,9 +77,14 @@ Run on a machine with Node **18–20** and Chrome (see repo `engines` / `.nvmrc`
 | `CHROME_PATH` | e.g. `auto` per [.env.example](../../.env.example). |
 
 ```bash
-yarn install --frozen-lockfile && yarn prisma generate
+yarn install --frozen-lockfile
+yarn prisma generate
+# Align the DB schema with this branch (same DATABASE_* as worker / Preview):
+yarn db:migrate
 yarn work   # or: yarn worker:prod / Docker worker service
 ```
+
+`yarn db:migrate` runs `prisma migrate deploy`. It needs **`DATABASE_URL` and `DATABASE_URL_UNPOOLED`** in the shell env (e.g. `tsx --env-file=.env` as in `yarn work`).
 
 ### 4. Smoke test
 
@@ -94,6 +101,25 @@ npx vercel env pull .env.vercel.preview --environment=preview --yes
 # Push only DB URLs to Vercel Preview for a given Git branch (requires Vercel CLI auth)
 node scripts/push-preview-db-env.mjs .env.vercel.preview <git-branch-name>
 ```
+
+---
+
+## Troubleshooting: worker Prisma (`P2022`, “column does not exist”, “Unknown argument `renderError`”)
+
+That combination almost always means **the database and/or generated client are not on this branch’s migration history**.
+
+1. **Same DB as Preview** — Worker `.env` `DATABASE_URL` / `DATABASE_URL_UNPOOLED` must be the **same** Postgres the Preview app uses (otherwise you chase ghosts).
+2. **Apply migrations** — From repo root, with those vars loaded:
+
+   ```bash
+   yarn prisma generate
+   yarn db:migrate
+   ```
+
+   On a DB that was created only with old `db:push` / an older branch, `migrate deploy` adds missing `Video` columns (`renderError`, `videoUrl`, `gifUrl`, etc.) per `prisma/migrations/`.
+3. **Regenerate after branch switches** — If you `git checkout` another branch and back, run `yarn prisma generate` again so `node_modules/@prisma/client` matches `prisma/schema.prisma`. Stale clients can reference columns that no longer exist in the schema (or the opposite: code uses fields the client does not know).
+
+After (2) and (3), restart `yarn work` and retry a render.
 
 ---
 
