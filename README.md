@@ -110,6 +110,8 @@ Downloading Chrome in Docker doesn’t work on my macOS for some reason.
 
 Preview deployments need **`DATABASE_URL`** (and related secrets) in the Vercel project; the **video worker** is a separate process (Docker Compose `worker`, another container, or a VM). Step-by-step dashboard instructions and a minimal worker runbook: [docs/hosting-vercel-and-worker.md](docs/hosting-vercel-and-worker.md).
 
+**Fork maintainer (engineereng):** short Preview checklist + long-lived branch strategy: [docs/fork/vercel-preview-runbook.md](docs/fork/vercel-preview-runbook.md).
+
 </details>
 
 ## Contributions
